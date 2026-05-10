@@ -1,0 +1,24 @@
+# wechat-publisher 统一配置模板
+# 复制为 wechat-publisher.yaml 并填入真实凭证
+
+default: main
+
+accounts:
+  main:
+    name: "我的公众号"
+    app_id: "wx..."
+    app_secret: "..."
+    author: "作者名"
+    theme: "refined-blue"
+    image_style: "hand-drawn-blue"
+    newspic_image_style: "infographic-warm"
+    voice: |
+      作者简介和写作风格描述。
+    sync_platforms: []
+
+image_generation:
+  # Hermes 环境下不使用此配置，直接用 image_generate 工具
+  generator: "baoyu-image-gen"
+
+integrations:
+  wechatsync_mcp_token: ""

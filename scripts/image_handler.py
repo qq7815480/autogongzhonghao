@@ -116,9 +116,84 @@ def upload_content_image_cached(local_path, temp_dir, manifest=None):
 # 图片下载
 # ============================================================
 
+def _is_valid_image(filepath):
+    """
+    通过 magic bytes 验证文件是否为有效图片。
+    防止防盗链返回的 HTML 错误页被当成图片上传。
+    """
+    try:
+        with open(filepath, "rb") as f:
+            header = f.read(16)
+        # JPEG: FF D8 FF
+        if header[:3] == b'\xff\xd8\xff':
+            return True
+        # PNG: 89 50 4E 47
+        if header[:4] == b'\x89PNG':
+            return True
+        # GIF: 47 49 46 38
+        if header[:4] == b'GIF8':
+            return True
+        # WebP: RIFF....WEBP
+        if header[:4] == b'RIFF' and header[8:12] == b'WEBP':
+            return True
+        # BMP: 42 4D
+        if header[:2] == b'BM':
+            return True
+        return False
+    except Exception:
+        return False
+
+
+def _download_with_crawl4ai(url, filepath):
+    """
+    用 crawl4ai 浏览器渲染下载图片（处理防盗链的备用方案）。
+    crawl4ai 会模拟真实浏览器行为，包括执行 JS 和发送正确的 Referer。
+    """
+    try:
+        import subprocess
+        import json as _json
+        # 用 crawl4ai 的 jina_read 获取图片
+        # 但 crawl4ai 主要用于页面，图片还是需要浏览器直接获取
+        # 这里用 curl 带完整浏览器 headers 作为最后手段
+        result = subprocess.run(
+            [
+                "curl", "-sL", "-o", str(filepath),
+                "-H", "User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                "-H", "Referer: https://mp.weixin.qq.com/",
+                "-H", "Accept: image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
+                "-H", "Accept-Language: zh-CN,zh;q=0.9,en;q=0.8",
+                "-H", "sec-ch-ua: \"Not_A Brand\";v=\"8\", \"Chromium\";v=\"120\", \"Google Chrome\";v=\"120\"",
+                "-H", "sec-ch-ua-mobile: ?0",
+                "-H", "sec-ch-ua-platform: \"macOS\"",
+                "-H", "Sec-Fetch-Dest: image",
+                "-H", "Sec-Fetch-Mode: no-cors",
+                "-H", "Sec-Fetch-Site: cross-site",
+                url
+            ],
+            timeout=30,
+            capture_output=True
+        )
+        if result.returncode == 0 and filepath.exists() and filepath.stat().st_size > 1000:
+            if _is_valid_image(filepath):
+                return True
+        # curl 也失败了，删除可能的无效文件
+        if filepath.exists():
+            filepath.unlink()
+        return False
+    except Exception:
+        if filepath.exists():
+            filepath.unlink()
+        return False
+
+
 def download_image(url, save_dir, filename=None, timeout=15, max_retries=2):
     """
     从URL下载图片到本地，支持自动重试。
+
+    对微信CDN图片（mmbiz.qpic.cn）自动处理防盗链：
+    1. 添加 Referer 头
+    2. 下载后验证 magic bytes
+    3. 失败时用 curl 带完整浏览器 headers 重试
 
     Args:
         url: 图片URL
@@ -145,11 +220,19 @@ def download_image(url, save_dir, filename=None, timeout=15, max_retries=2):
 
     filepath = save_dir / filename
 
+    # 判断是否是微信CDN域名
+    parsed_url = urlparse(url)
+    wechat_cdn_domains = ("mmbiz.qpic.cn", "mmbiz.qlogo.cn")
+    is_wechat_cdn = any(d in parsed_url.netloc for d in wechat_cdn_domains)
+
     for attempt in range(max_retries + 1):
         try:
             headers = {
                 "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
             }
+            # 微信CDN图片防盗链：需要带 Referer 才能正常下载
+            if is_wechat_cdn:
+                headers["Referer"] = "https://mp.weixin.qq.com/"
             resp = requests.get(url, headers=headers, timeout=timeout, stream=True, allow_redirects=True)
             resp.raise_for_status()
 
@@ -160,7 +243,7 @@ def download_image(url, save_dir, filename=None, timeout=15, max_retries=2):
                     print(f"  非图片类型 ({content_type})，重试 ({attempt+1}/{max_retries})...")
                     continue
                 print(f"  警告：{url[:60]} 返回的不是图片类型 ({content_type})")
-                return None
+                break  # 跳出重试循环，尝试备用方案
 
             with open(filepath, "wb") as f:
                 for chunk in resp.iter_content(chunk_size=8192):
@@ -170,11 +253,21 @@ def download_image(url, save_dir, filename=None, timeout=15, max_retries=2):
             file_size = filepath.stat().st_size
             if file_size < 1000:  # 小于1KB可能不是有效图片
                 filepath.unlink()
-                return None
+                if attempt < max_retries:
+                    print(f"  文件过小 ({file_size}B)，重试 ({attempt+1}/{max_retries})...")
+                    continue
+                break  # 尝试备用方案
+
             if file_size > 10 * 1024 * 1024:
                 print(f"  警告：图片过大 ({file_size/1024/1024:.1f}MB)，尝试跳过：{url[:60]}")
                 filepath.unlink()
                 return None
+
+            # 🔑 关键验证：检查 magic bytes 确保是真图片
+            if not _is_valid_image(filepath):
+                print(f"  下载内容不是有效图片（可能是防盗链错误页），尝试备用方案")
+                filepath.unlink()
+                break  # 跳出重试循环，尝试备用方案
 
             # WebP格式转JPG（微信对WebP支持不稳定）
             if filepath.suffix.lower() == ".webp":
@@ -200,6 +293,23 @@ def download_image(url, save_dir, filename=None, timeout=15, max_retries=2):
 
         if filepath.exists():
             filepath.unlink()
+
+    # 备用方案：对微信CDN图片用 curl 带完整浏览器 headers 下载
+    if is_wechat_cdn:
+        print(f"  尝试备用方案：curl 带完整浏览器 headers 下载...")
+        if _download_with_crawl4ai(url, filepath):
+            file_size = filepath.stat().st_size
+            # WebP格式转JPG
+            if filepath.suffix.lower() == ".webp":
+                jpg_path = filepath.with_suffix(".jpg")
+                converted = convert_webp_to_jpg(str(filepath), str(jpg_path))
+                if converted:
+                    filepath.unlink()
+                    filepath = jpg_path
+            print(f"  备用方案下载成功：{filepath.name} ({file_size/1024:.0f}KB)")
+            return str(filepath)
+        else:
+            print(f"  备用方案也失败了：{url[:60]}")
 
     return None
 

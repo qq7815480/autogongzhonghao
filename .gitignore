@@ -30,6 +30,9 @@ article_preview.html
 generated/*
 !generated/README.md
 
+# Work output (contains article drafts, images, etc.)
+sunwork/
+
 # IDE / Harness state
 .vscode/
 .idea/
