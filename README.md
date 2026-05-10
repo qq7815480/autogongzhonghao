@@ -9,13 +9,13 @@
 作为 Claude Code / Cursor / Copilot Skill 使用(通过 [skills.sh](https://skills.sh) 注册):
 
 ```bash
-npx skills add jiji262/wechat-publisher
+npx skills add qq7815480/autogongzhonghao
 ```
 
 或手动放入 `~/.claude/skills/`:
 
 ```bash
-git clone https://github.com/jiji262/wechat-publisher.git ~/.claude/skills/wechat-publisher
+git clone https://github.com/qq7815480/autogongzhonghao.git ~/.claude/skills/wechat-publisher
 cp ~/.claude/skills/wechat-publisher/wechat-publisher.yaml.example ~/.claude/skills/wechat-publisher/wechat-publisher.yaml
 # 编辑 wechat-publisher.yaml 填入公众号、生图、同步等配置
 pip install requests pyyaml
@@ -71,7 +71,7 @@ wechat-publisher/
 ### 1. 克隆项目
 
 ```bash
-git clone https://github.com/jiji262/wechat-publisher.git
+git clone https://github.com/qq7815480/autogongzhonghao.git
 cd wechat-publisher
 ```
 
