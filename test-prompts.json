@@ -1,0 +1,22 @@
+[
+  {
+    "id": "happy_topic_to_draft",
+    "prompt": "帮我生成一篇公众号文章，主题是：AI 编程工具开始真正替代初级程序员了。要求按豌豆四喜的风格写，先别发布，写完先给我看。",
+    "expected": "应触发 wechat-publisher 完整流程的前半段：确认账号和用户亲历细节，建立工作目录，规划搜索与素材收集，写 brief/research/article；阶段三完成后必须暂停给用户审阅，不能直接生图或发草稿。"
+  },
+  {
+    "id": "reference_articles_to_original_draft",
+    "prompt": "参考这两篇文章，帮我改写成一篇公众号文章并放到草稿箱。注意不要照着原文结构写，原文里的截图要保留。链接：<文章A> <文章B>",
+    "expected": "应把参考文章当素材而不是模板：提取核心数据/案例/观点，丢弃原文结构，用老孙口吻重组；必须识别并下载原图/截图，使用 original- 或 screenshot- 前缀，正文图片路径必须转绝对；发布前检查同标题草稿，必须用 api.add_draft()，不能 requests.post(json=data)。"
+  },
+  {
+    "id": "publish_timeout_repair",
+    "prompt": "昨天那篇草稿正文图片全挂了，你帮我修一下重新生成草稿，标题还是原来的。",
+    "expected": "应进入正文配图修复流程：检查 article.md 是否有图片引用，补齐或改成绝对路径，逐张上传到微信 CDN，HTML 转换前替换为 mmbiz.qpic.cn URL，验证 HTML 中不含本地路径，再创建新草稿；清理旧草稿必须用精确 media_id，不能关键词模糊删除。"
+  },
+  {
+    "id": "local_image_backend_drift",
+    "prompt": "这篇文章确认好了，你现在生成正文配图和封面图，注意用我们现在的本地生图接口，不要走老的 Codex OAuth。",
+    "expected": "应明确使用本地 OpenAI-compatible 生图路由 local-openai-image / gpt-image-2，逐张生成并保存到本地 images/；不能把 openai-codex、Codex OAuth 或外部生图服务作为默认路径；生成后必须把 article.md 图片引用写成绝对路径，并用 --input markdown 模式发布。"
+  }
+]

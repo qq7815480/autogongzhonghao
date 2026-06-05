@@ -14,13 +14,14 @@ description: |
 
 工作目录: `~/.hermes/skills/wechat-publisher/sunwork/`
 脚本目录: `~/.hermes/skills/wechat-publisher/scripts/`
+GitHub 仓库: `https://github.com/qq7815480/autogongzhonghao` (fork of jiji262/wechat-publisher)
 
 ## 前置条件
 
 已配置: AppID/AppSecret 已写入 `wechat-publisher.yaml`，API 连通已验证。
 依赖: `requests`, `pyyaml` (已安装)。
-生图: 使用 Hermes 内置 `image_generate` 工具，provider 为 `openai-codex` (GPT Image 2)。
-生图细节: `references/codex-oauth-image-gen.md`
+生图: 必须走本地 OpenAI-compatible 生图 API，不走外部生图服务；默认使用 Hermes `local-openai-image / gpt-image-2（image2）` 路由，生成后保存本地文件。
+生图细节: 参考当前 Hermes `image_gen.local-openai-image` 配置；历史 Codex OAuth 方案仅作旧方案排障参考，不能作为默认路径。
 
 ## 完整工作流程
 
@@ -114,7 +115,9 @@ description: |
 
 > **⚠️ 不要犯的错误**: 文章讲的是某个软件的操作步骤，配图却是一张抽象手绘 —— 读者看不懂，内容和图对不上。
 
-> **⛔ 参考文章里的原图必须优先使用**: 如果用户给了参考文章，文章里的截图、对比图、数据图、产品界面等**必须直接用原图**，不能用 baoyu-article-illustrator 生成的抽象手绘图替代。原图承载的是具体的信息（错误截图、对比结果、UI细节），AI 生成图无法替代。只有当参考文章中**没有对应视觉素材**的纯文字段落，才用 baoyu-article-illustrator 生成配图。
+> **⛔ 参考文章里的原图必须优先使用**: 如果用户给了参考文章，文章里的截图、对比图、数据图、产品界面等**必须直接用原图**，不能用 baoyu-article-illustrator 生成的抽象手绘图替代。原图承载的是具体信息（错误截图、对比结果、UI细节），AI 生成图无法替代。只有当参考文章中**没有对应视觉素材**的纯文字段落，才用 baoyu-article-illustrator 生成配图。
+
+> **📋 提取参考文章原图的具体步骤**: 见 `references/extracting-reference-images.md`（JS提取URL → curl带Referer下载 → 用`screenshot-`前缀命名 → 文章中写**绝对路径**）。
 
 ### 阶段三: 撰写骨架稿 (第一轮)
 
@@ -271,41 +274,51 @@ Claude 明确说: "现在进入人味化改写 pass"。对骨架稿**逐段**过
 
 ### 阶段四: 生成配图 (baoyu-article-illustrator)
 
-使用 `baoyu-article-illustrator` skill 生成正文配图，替代原有的简单模板生图。
+使用 `baoyu-article-illustrator` skill 生成正文配图。它会分析文章结构、识别最佳插图位置、生成结构化 prompt（含文章实际数据），质量高于简单模板生图。
 
-**为什么替换**: baoyu-article-illustrator 会分析文章结构、识别最佳插图位置、生成结构化 prompt（含文章实际数据），配图质量远高于简单模板。
+#### 前置步骤 (必须先执行)
 
-**风格**: `hand-drawn`（暖色手绘笔记风），与 warm-editorial 排版和文艺手绘封面统一。
-
-**流程:**
-
-**⚠️ 前置步骤（必须先执行）: 检测已有原图**
+1. 扫描 `article.md` 中已有图片引用：
 
 ```bash
-# 扫描 article.md 中已有的图片引用
-grep -oP '!\[.*?\]\((.*?)\)' ~/.hermes/skills/wechat-publisher/sunwork/<date-slug>/article.md
+grep -n '!\[' article.md
 ```
 
-1. 扫描 `article.md`，提取所有已存在的 `![...](...)` 图片引用
-2. 将已有图片分类：
-   - `images/original-*` 或 `images/screenshot-*` → **原图**（来自阶段2.5下载）
-   - `images/01-*.png`、`images/02-*.png` 等 → **AI生成图**（来自之前流程）
-3. 标记已有原图的段落为「**跳过**」，不需要再生成配图
-4. **只为没有原图的纯文字段落**生成AI配图
+2. 按文件名判断处理方式：
+   - `images/original-*` 或 `images/screenshot-*` → 原图，必须保留并跳过，不生成 AI 替代图
+   - `images/01-*`、`images/02-*` 等 → 旧 AI 图，按需保留或替换
+   - 没有图片的纯文字段落 → 才生成 AI 配图
 
-> **⛔ 铁律**: 如果一个段落已经有了 `images/original-*.png` 或 `images/screenshot-*.png` 等原图，**绝对不能再用 baoyu-article-illustrator 生成替代图**。原图承载的是具体信息（UI截图、数据对比、操作步骤），AI 抽象图无法替代。
+> **⛔ 铁律**: 已经有 `original-*` 或 `screenshot-*` 原图的段落，绝对不能再用 AI 抽象图替代。原图承载的是具体信息（UI截图、数据对比、操作步骤）。
 
-**生成步骤（对需要配图的段落）:**
+#### 生成步骤（只针对需要配图的纯文字段落）
 
 1. 加载 `baoyu-article-illustrator` skill
-2. 传入 `article.md`，skill 自动分析文章结构和内容
-3. 生成 `outline.md`（插图位置、目的、视觉内容）—— **已标记跳过的段落不生成**
+2. 传入 `article.md`，分析文章结构和内容
+3. 生成 `outline.md`（插图位置、目的、视觉内容），已标记跳过的原图段落不生成
 4. 为每张图创建 prompt 文件（`prompts/NN-type-slug.md`）
-5. 调用 `image_generate` 逐张生成（可并行：多个 `image_generate` 调用互不依赖时，放在同一个 function_calls 块中并发执行，6 张图约 7 分钟完成）
-6. 下载到本地 `images/` 目录
-7. 在 `article.md` 中插入图片引用（只插入到没有原图的段落）
+5. 通过 Hermes 本地生图路由逐张生成：`local-openai-image / gpt-image-2`。**不要并行批量生成**，避免本地 API / 上游限流
+6. 保存到本地 `images/` 目录
+7. 插入图片引用时优先直接写绝对路径；如果已有相对路径，阶段四结束后必须统一转绝对路径
 
-**配置** (EXTEND.md):
+#### ⛔ 阶段四完成后必须执行：路径转绝对
+
+图片生成完毕后，立即验证 `article.md` 中没有相对图片路径：
+
+```bash
+grep -n '!\[' article.md
+grep -n '](' article.md | grep '](images/' && echo '发现相对路径，必须修复'
+```
+
+修复规则：把 `](images/xxx.png)` 改为 `](/Users/sun/.hermes/skills/wechat-publisher/sunwork/<date-slug>/images/xxx.png)`。在 Hermes 环境里优先用 `patch` 工具精确替换；shell 场景可用：
+
+```bash
+sed -i '' "s|](images/|]($(pwd)/images/|g" article.md
+```
+
+**为什么**：publish.py 在 `scripts/` 目录下运行，相对路径会解析失败，导致所有图片被跳过（"跳过无效路径"）。这是最常见的发布失败原因。
+
+#### 配置 (EXTEND.md)
 - style: hand-drawn（暖色纸+手绘线条+柔和色块）
 - palette: warm（暖色调，与 earth 封面色系协调）
 - language: zh（中文文字标注）
@@ -313,15 +326,7 @@ grep -oP '!\[.*?\]\((.*?)\)' ~/.hermes/skills/wechat-publisher/sunwork/<date-slu
 
 **⚠️ 所有图片中的文字、标注、标题必须是中文。**
 
-**Provider**: `openai-codex` (GPT Image 2)，通过 Codex OAuth 认证，不需要 API Key。
-
-**简化调用** (在 wechat-publisher 流程中):
-
-```
-加载 baoyu-article-illustrator skill，传入 article.md 路径，使用 --quick 模式自动分析并生成配图。
-```
-
-> 图片保存到 `sunwork/<date-slug>/imgs/` 目录后，publish.py 会自动处理：下载→上传微信 CDN→替换 URL。不需要手动上传。
+> 图片保存到 `sunwork/<date-slug>/images/` 目录后，publish.py --input 会自动处理：读取本地图片→上传微信 CDN→替换 URL。不需要手动上传。
 
 ### 阶段 4.5: 生成封面图 (baoyu-cover-image)
 
@@ -336,7 +341,7 @@ grep -oP '!\[.*?\]\((.*?)\)' ~/.hermes/skills/wechat-publisher/sunwork/<date-slu
 1. 加载 `baoyu-cover-image` skill
 2. 传入文章标题和主题，自动生成封面 prompt
 3. **⛔ 必须在 prompt 中加入安全区要求**（见下方）
-4. 调用 `image_generate` 生成封面图
+4. 通过 Hermes 本地生图路由 `local-openai-image / gpt-image-2` 生成封面图
 5. **裁切到2.35:1**: `sips --cropToHeightWidth 653 1536 cover_raw.png --out cover.png`（GPT Image 2 只支持16:9，必须裁切）
 6. **验证裁切结果**: 检查封面图，确保标题和主要元素完整可见，没有被裁切掉
 7. 传给 `publish.py --cover`
@@ -367,7 +372,7 @@ GPT Image 2 只支持 16:9 (1536×1024)，微信封面需要 2.35:1 (900×383)�
 # baoyu-cover-image 会自动:
 # 1. 分析文章内容，提取主题和关键词
 # 2. 生成封面 prompt (含标题文字)
-# 3. 调用 image_generate 生成 2.35:1 封面
+# 3. 通过 local-openai-image / gpt-image-2 生成封面原图
 # 4. 保存到 cover.jpg
 ```
 
@@ -416,6 +421,8 @@ publish.py 会自动:
 3. 跑 AI 味 gate，不过就停
 4. 处理图片 → HTML 转换 → 封面上传 → 创建草稿
 5. 返回 `media_id`
+
+**⛔ 必须用 `--input` (markdown 模式)，不能用 `--html`**。`--html` 模式跳过正文图片上传，只有封面图会被处理。
 
 **不需要手动传 `--theme` 或 `--author`** —— 账号配置会自动带入。
 
@@ -488,14 +495,22 @@ sunwork/<date-slug>/
 
 ## 参考文件
 
+- `references/extracting-reference-images.md` — **从参考文章提取原图的完整流程**（JS提取URL + curl下载 + 绝对路径插入）
+- `WORKFLOW.md` — **完整工作流文档**（阶段一~六的详细步骤、常见坑、命令参考，适合直接发给用户或新 Agent 阅读）
 - `references/setup-notes.md` — 安装踩坑、API 验证流程、生图适配方案
-- `references/codex-oauth-image-gen.md` — Codex OAuth token 管理（GPT Image 2 认证）
+- `references/codex-oauth-image-gen.md` — 历史旧方案排障参考（Codex OAuth），默认流程不要使用
 - `references/baoyu-skills-integration.md` — baoyu-cover-image 和 baoyu-article-illustrator 集成详情
 - `references/image-prompts.md` — 生图 prompt 模板和最佳实践
+- `references/local-image-generation.md` — 本地 OpenAI-compatible 生图 API 约定；默认 `local-openai-image / gpt-image-2`，不走外部生图服务
 - `references/manual-publish-workflow.md` — publish.py 超时时的手动分步发布流程
+- `references/manual-publish-workflow-v2.md` — **推荐**：经实战验证的完整分步发布代码（execute_code 版，含 html_converter API 正确用法）
+- `references/draft-image-reupload-checklist.md` — **正文配图失败后的重传检查清单**：必须插入 Markdown、上传正文图到微信 CDN、断言 HTML 中含 `mmbiz.qpic.cn`
+- `references/body-image-repair-workflow.md` — **正文配图失败修复流程**：补图、绝对路径插入、上传微信 CDN、HTML 前替换、本地路径校验、重新创建新草稿
 - `references/reference-article-writing.md` — 参考文章写作规范：原料vs模板、案例/时间/术语替换、用户反馈常见问题
 - `references/wechat-cdn-anti-hotlinking.md` — 微信CDN图片防盗链完整方案（Referer + magic bytes + curl备用）
 - `references/first-article-workflow.md` — 首篇完整文章的执行日志、pitfalls、AI味检测结果
+- `references/multi-reference-articles.md` — 多篇参考文章的处理流程（提取→丢结构→融合改写），微信文章抓取技巧
+- `references/image-generation-pitfalls.md` — **配图生成坑点**：并发超时（必须串行）、大文件publish.py超时、cover.jpg格式问题
 - `templates/wechat-publisher.yaml.template` — 配置模板
 
 ## 视觉风格体系
@@ -507,7 +522,7 @@ sunwork/<date-slug>/
 | **封面图** | baoyu-cover-image | scene + earth + hand-drawn + subtle |
 | **正文配图** | baoyu-article-illustrator | hand-drawn + warm |
 | **排版主题** | warm-editorial | 栗色暖调 + 米白纸 + 宋体 |
-| **生图后端** | GPT Image 2 | openai-codex (Codex OAuth) |
+| **生图后端** | GPT Image 2 | local-openai-image（本地 OpenAI-compatible API） |
 
 三者协调：暖色 + 手感 + 文艺杂志感，视觉语言完全统一。
 
@@ -520,27 +535,58 @@ sunwork/<date-slug>/
   - 配置: `~/.baoyu-skills/baoyu-article-illustrator/EXTEND.md`
   - style=hand-drawn，palette=warm，language=zh，output=imgs-subdir
 
+## 推送到 GitHub
+
+仓库地址: `https://github.com/qq7815480/autogongzhonghao.git`（fork of jiji262/wechat-publisher）
+
+推送前必须确保 GitHub 凭证已配置（token 或 SSH key）。`wechat-publisher.yaml` 已在 `.gitignore` 中，不会被提交。`sunwork/` 目录也已排除。
+
+```bash
+cd ~/.hermes/skills/wechat-publisher
+git add -A
+git commit -m "type: 描述"
+git push origin main
+```
+
+## 话题素材库
+
+已有素材库（写相关话题时直接加载）：
+- `references/ai-relay-station-research.md` — AI中转站：数据、玩家、检测方法、管控时间线、Token出口机会
+- `references/deepseek-agent-price-research.md` — DeepSeek V4 降价、700亿融资传闻、Code Harness/AI Coding 入口争夺素材库（注意未官宣信息需标注传闻）
+
 ## 常见坑
 
 - `wechat-publisher.yaml` 必须在仓库根目录，不在 scripts/ 下
 - macOS 系统 Python 装依赖: `python3 -m pip install requests pyyaml` (不要 `--break-system-packages`)
-- 生图脚本 `generate_image.py` 需要 `bun`，Hermes 环境下跳过它，直接用 `image_generate` 工具
+- 生图脚本 `generate_image.py` 需要 `bun`，Hermes 环境下跳过它，走本地 OpenAI-compatible 生图路由 `local-openai-image / gpt-image-2`
 - 新闻图片模式 (newspic) 每张图都占永久素材名额，5-10 张/次
 - 正文图和封面图的上传接口不同，名额计算也不同
-- **Codex OAuth token 有两套存储**: `providers.openai-codex` 和 `credential_pool.openai-codex`。插件优先读 pool，refresh 时两处都要更新
-- **Codex OAuth client_id**: `app_EMoamEEZ73f0CkXaXp7hrann`（注意大小写），token endpoint: `https://auth.openai.com/oauth/token`
+- **旧方案排障**: `openai-codex` / Codex OAuth 只作为历史参考，不是默认生图路径。默认生图必须走 `local-openai-image / gpt-image-2`
 - **封面图不要用文章配图代替**: 必须用 baoyu-cover-image 单独生成 2.35:1 封面
 - **排版主题在 wechat-publisher.yaml 中配置**: `theme: "warm-editorial"`，不要在 publish.py 命令行覆盖
 - `publish.py` 会自动重新处理文章中的所有图片 (下载→上传微信 CDN)，不需要在阶段四手动上传 CDN
+- **⛔ publish.py 的 `--html` 模式不会上传正文配图**: 如果用 `--html article.html` 传入预转换的 HTML，脚本**只上传封面图**，不会扫描和上传正文中的本地图片。正文图片会保持本地路径，在微信中显示为空白。必须使用 `--input article.md`（markdown 模式），脚本才会自动检测 `![](...)` 引用、上传到微信 CDN、替换 URL。如果已经用 `--html` 发了且正文图缺失，删掉草稿，用 `--input` 重新发布
 - **图片相对路径陷阱**: publish.py 从 `scripts/` 目录运行，但文章中图片引用如 `![desc](images/01-xxx.png)` 是相对路径，会被解析为 `scripts/images/01-xxx.png` 导致全部跳过（"跳过无效路径"）。**解决方案**: 在 article.md 中使用**绝对路径**引用图片，如 `![desc](/Users/sun/.hermes/skills/wechat-publisher/sunwork/<date-slug>/images/01-xxx.png)`。或者在阶段四插入图片引用时，直接写绝对路径而非相对路径。
 - `image_handler.py upload` 输出有中文前缀 `正文图片上传成功: `，解析 JSON 会失败，需正则提取 URL
 - urllib3 在 macOS LibreSSL 下会报警告，可忽略
 - **微信草稿 API 标题长度限制**: 实测约 36 字节 UTF-8（约12个中文字符），比官方文档说的 64 字节短很多。标题超长会报 45003。摘要(digest)限制约 41 字节，超长报 45004
 - **publish.py 大文件超时**: 当文章含多张大图（3MB+）时容易超时。解决方案：分步执行——先手动调 upload_thumb_image() 上传封面，再逐张调 upload_content_image() 上传正文图，然后用 html_converter.py 转 HTML，最后调 api.add_draft() 创建草稿。注意：必须用 api.add_draft()，不能用 requests.post(json=data)
+- **⛔ 分步发布时 html_converter 的正确用法**: 函数名是 `convert_markdown_to_wechat_html`（不是 `convert_markdown_to_html`）。签名：`(markdown_text, styles=None, highlights=None, divider_text=None, list_style=None)`。`load_theme('warm-editorial')` 返回的是 **4元素元组** `(styles_dict, highlights, divider_text, list_style)`，必须解包后传入：
+  ```python
+  from html_converter import convert_markdown_to_wechat_html, load_theme
+  styles, highlights, divider, list_style = load_theme('warm-editorial')
+  html = convert_markdown_to_wechat_html(md, styles=styles, highlights=highlights, divider_text=divider, list_style=list_style)
+  ```
+  直接 `styles=load_theme(...)` 会报 `TypeError: tuple indices must be integers`。
+- **分步发布的图片路径替换**: 在调用 `convert_markdown_to_wechat_html` 之前，必须先把 article.md 中的本地绝对路径替换为微信 CDN URL（upload_content_image 返回的），否则 HTML 中的图片引用还是本地路径，publish 不会再处理。
+- **正文配图失败/缺失修复**: 如果用户反馈草稿正文图失败，优先按 `references/body-image-repair-workflow.md` 操作：确认 `article.md` 是否有图片引用；补齐正文图并用绝对路径插入；逐张上传 `upload_content_image()`；HTML 转换前替换为微信 CDN；正则验证所有 `![](...)` 都是 `https://mmbiz.qpic.cn/`；重新创建新草稿并提醒用户看最新草稿、旧草稿可删。
+- **api.py 可用函数清单**: `set_account`, `get_access_token`, `add_draft`, `add_newspic_draft`, `upload_thumb_image`, `upload_content_image`, `upload_newspic_image`, `publish_article`, `publish_newspic`。没有 `get_token`，是 `get_access_token`。
 - **封面图比例裁切**: GPT Image 2 只支持 16:9/9:16/1:1，无法直接生成2.35:1。生成后必须用 `sips --cropToHeightWidth 653 1536 input.png --out cover.png` 裁切到2.35:1（以1536宽度为基准，高度653）
 - **⛔ 图片路径必须用绝对路径**: article.md 中的图片引用必须使用绝对路径（如 `/Users/sun/.hermes/skills/wechat-publisher/sunwork/xxx/images/01.png`），不能用相对路径（如 `images/01.png`）。publish.py 在 scripts/ 目录下运行时，相对路径会解析失败导致图片全部跳过。写完 article.md 后，必须用 `patch` 工具将所有 `images/` 替换为绝对路径前缀
+- **封面图生成失败的临时方案**: 当本地生图 API 限流或失败时，先等待 20-60 秒重试；仍失败时，用之前文章的封面图作为 `--cover` 参数先发布，后续在微信公众平台手动替换。不要切回 `openai-codex` 作为默认方案
 - **⛔ 微信公众号图片防盗链（已修复）**: `download_image` 函数已增强，自动处理微信 CDN 防盗链：① 自动添加 `Referer: https://mp.weixin.qq.com/` 头；② 下载后用 magic bytes 验证是否为真图片（防止 HTML 错误页被当图片上传）；③ 如果 requests 下载失败，自动用 curl 带完整浏览器 headers 作为备用方案。理论上不再需要手动下载图片
 - **ai_score.py 会检测"在...的背景下"为 AI 套话**: 即使语境具体也会命中。改用口语化表达
+- **微信公众号文章抓取**: `web_extract` 和 `jina_read`/`crawl4ai` 都会被拦截。优先用 `browser_navigate`；如果 Camofox 没运行则用 `curl -sL -A 'Chrome/126...'` + python3 正则提取 `<div id="js_content">` 内容。详见 `references/multi-reference-articles.md`
 - **新闻/评论类文章（无参考截图）可跳过阶段2.5和阶段四**，直接从骨架稿到人味化改写再到发布。配图按需生成，不必强制6-10张
 - **⛔ 改写文章长度超标**: 用户多次纠正——改写后的文章不能比参考文章长太多。参考文章 3000 字，改写 3800 字就是失败。必须控制在 ±10% 以内。写完后用 `wc -m` 或手动估算字数，超了就删减
 - **⛔ 写完文章直接生图**: 用户明确要求先审阅文章再配图。阶段三完成后必须暂停等用户确认
