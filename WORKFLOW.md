@@ -35,24 +35,23 @@ cp wechat-publisher.yaml.example wechat-publisher.yaml
 ```
 
 配置结构：
-
 ```yaml
 default: main
 
 accounts:
   main:
     name: "你的公众号名称"
-    app_id: "wx1234567890abcdef"        # 从微信公众平台获取
-    app_secret: "your_app_secret_here"  # 从微信公众平台获取
+    app_id: "wx1234567890abcdef"        # 从微信公众平台获取，本地填写，禁止提交
+    app_secret: "your_app_secret_here"  # 从微信公众平台获取，本地填写，禁止提交
     author: "作者名"
     theme: "warm-editorial"             # 排版主题
     image_style: "hand-drawn-blue"      # 配图风格
     voice: |
       写作风格描述...
 
-image_generation:
-  generator: "baoyu-image-gen"
-
+# 生图默认走运行时提供的本地 OpenAI-compatible 路由。
+# 在 Hermes 下使用 local-openai-image / gpt-image-2。
+# 不要把 Web Gemini、Codex OAuth、scripts/generate_image.py 当默认发布链路。
 integrations:
   wechatsync_mcp_token: ""
 ```
@@ -316,6 +315,8 @@ python3 publish.py \
 
 publish.py 自动: 读取账号配置 → 跑 AI 味 gate → 处理图片 → HTML 转换 → 封面上传 → 创建草稿
 
+⛔ 正式发布必须用 `--input` Markdown 模式。不要用 `--html article.html` 发布正文图，因为 `--html` 只处理封面，不会扫描 Markdown 里的本地正文图片，也不会上传到微信 CDN，正文图会变空白。已经误用 `--html` 的，删除旧草稿后用 `--input article.md` 重新创建。
+
 ## 阶段六: 告知用户
 
 - 告知草稿已保存到草稿箱
@@ -413,4 +414,4 @@ GPT Image 2 只支持 16:9/9:16/1:1，无法直接生成 2.35:1。生成后必�
 | 封面图 | baoyu-cover-image | scene + earth + hand-drawn + subtle |
 | 正文配图 | baoyu-article-illustrator | hand-drawn + warm |
 | 排版主题 | warm-editorial | 栗色暖调 + 米白纸 + 宋体 |
-| 生图后端 | GPT Image 2 | openai-codex (Codex OAuth) |
+| 生图后端 | GPT Image 2 | local-openai-image（本地 OpenAI-compatible API） |

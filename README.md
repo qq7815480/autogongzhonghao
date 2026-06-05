@@ -4,23 +4,32 @@
 
 微信公众号文章自动创作与发布工具。从选题搜索、文章撰写、AI配图生成、排版美化到发布草稿箱,一条命令搞定全流程。
 
-可作为 [Claude Code](https://claude.ai/code)、Codex、OpenClaw 的 Skill 使用,也可以独立命令行调用。
+可作为 Claude Code、Codex、Cursor、OpenClaw、Hermes 等兼容 Agent Skills 的运行时使用,也可以独立命令行调用。
 
 ## 安装
 
-作为 Claude Code / Cursor / Copilot Skill 使用(通过 [skills.sh](https://skills.sh) 注册):
+作为通用 Agent Skill 使用(通过 [skills.sh](https://skills.sh) 注册):
 
 ```bash
 npx skills add qq7815480/autogongzhonghao
 ```
 
-或手动放入 `~/.claude/skills/`:
+或手动放入当前运行时的 skills 目录。常见路径示例：
 
 ```bash
+# Hermes
+git clone https://github.com/qq7815480/autogongzhonghao.git ~/.hermes/skills/wechat-publisher
+
+# Claude Code
 git clone https://github.com/qq7815480/autogongzhonghao.git ~/.claude/skills/wechat-publisher
-cp ~/.claude/skills/wechat-publisher/wechat-publisher.yaml.example ~/.claude/skills/wechat-publisher/wechat-publisher.yaml
-# 编辑 wechat-publisher.yaml 填入公众号、生图、同步等配置
-pip install requests pyyaml
+
+# Codex
+git clone https://github.com/qq7815480/autogongzhonghao.git ~/.codex/skills/wechat-publisher
+
+cd /path/to/wechat-publisher
+cp wechat-publisher.yaml.example wechat-publisher.yaml
+# 编辑 wechat-publisher.yaml 填入公众号配置；真实密钥不要提交
+python3 -m pip install requests pyyaml
 ```
 
 首次用调 `python3 scripts/wechat_api.py list-accounts` 确认账号配置 OK,再跑 `python3 -c "from wechat_api import get_access_token; print(get_access_token()[:10])"` 验证 API 连通。遇到 `40164` 报错就把 `curl ifconfig.me` 拿到的公网 IP 去[公众平台](https://mp.weixin.qq.com)后台加白名单。
@@ -29,7 +38,7 @@ pip install requests pyyaml
 
 - **全网素材搜索**:围绕话题自动多轮搜索,交叉验证数据,筛选最新案例和权威观点
 - **AI智能写作**:按照头部博主风格生成3000-5000字深度文章,反AI味写作规则,段落短小有呼吸感
-- **AI配图生成**:通过项目内置 `scripts/generate_image.py` 为每个章节生成风格统一的手绘信息图(6-10张/篇),默认走 `baoyu-image-gen`,也可切到 Web 登录版 Gemini
+- **AI配图生成**:默认通过运行时提供的本地 OpenAI-compatible 生图路由（Hermes 下为 `local-openai-image / gpt-image-2`） 逐张生成正文图和封面图；参考文章里的截图、数据图、产品界面优先保留原图，不用 AI 图替代
 - **微信排版转换**:Markdown → 微信兼容 HTML,所有样式自动内联,内置 **16 套主题(v2026)**,覆盖 AI/技术/商业/新闻/人文/生活/时尚 7 大场景,见下方[排版主题](#排版主题)章节
 - **图片CDN上传**:自动上传图片到微信服务器,获取 `mmbiz.qpic.cn` 链接并替换占位符
 - **一键发布草稿**:封面图、标题、摘要、作者全部自动填好,直达草稿箱
@@ -82,7 +91,7 @@ cd wechat-publisher
 `pyyaml` 是硬依赖(读 `wechat-publisher.yaml`),`requests` 用于 HTTP 调用:
 
 ```bash
-pip install requests pyyaml --break-system-packages
+python3 -m pip install requests pyyaml
 ```
 
 ### 3. 配置微信公众号
@@ -102,12 +111,8 @@ accounts:
     app_secret: "..."
     author: "飞哥"
 
-image_generation:
-  generator: "baoyu-image-gen"
-  gemini_proxy:
-    base_url: "https://website-data-analysis.replit.app"
-    api_key: "cr_..."
-    image_model: "gemini-3-pro-image-preview"
+# 生图默认走运行时提供的本地 OpenAI-compatible 路由：local-openai-image / gpt-image-2
+# 公众号凭证和其他密钥只放本地配置文件，禁止提交到 git
 
 integrations:
   wechatsync_mcp_token: ""
@@ -115,21 +120,13 @@ integrations:
 
 `wechat-publisher.yaml` 是唯一支持的配置文件,只从 skill 根目录读取。
 
-### 3.1 配置生图后端
+### 3.1 生图后端约定
 
-项目内置统一生图入口 `scripts/generate_image.py` 不依赖外部 baoyu skills。默认后端是 `baoyu-image-gen`,也就是本项目内置的 `scripts/baoyu_image_gen.ts`;可配置为 `baoyu-danger-gemini-web`,使用本项目内置拷贝的 Web 登录版 Gemini。
+默认生图后端是运行时提供的本地 OpenAI-compatible 路由：`local-openai-image / gpt-image-2`。正文配图和封面图都按 SKILL.md 阶段四、阶段 4.5 的流程逐张生成，生成结果保存到本地 `images/` 目录。
 
-默认 `baoyu-image-gen` 支持两种 provider:
+不要把旧的 `scripts/generate_image.py` / Web Gemini / Codex OAuth 方案当默认路径。那些只作为历史排障资料保留。
 
-1. `openai`
-2. `gemini-proxy`(Gemini CLI / chat 代理)
-
-生图后端选择有两种:
-
-1. `baoyu-image-gen`:默认,支持 OpenAI Images 和 Gemini CLI / chat 代理
-2. `baoyu-danger-gemini-web`:Web 登录版 Gemini,使用 `scripts/baoyu_danger_gemini_web/`,需要本机已保存 Gemini Web 登录 cookie
-
-所有生图凭证都放在 `wechat-publisher.yaml` 的 `image_generation` 下。
+文章发布时，`article.md` 里的本地图片必须写绝对路径，并通过 `publish.py --input article.md` 走 Markdown 模式上传到微信 CDN。不要用 `--html article.html` 发布正文图。
 
 ### 4. 验证连接
 
@@ -148,24 +145,25 @@ python3 scripts/wechat_api.py list-accounts
 
 ### 方式一:安装到 Agent 客户端(推荐)
 
-本项目的核心入口是根目录下的 `SKILL.md`,推荐用**软链接**安装。这样后续只要更新当前仓库,Claude、Codex、OpenClaw 都会自动读到最新版本,不需要重复复制。
+本项目的核心入口是根目录下的 `SKILL.md`,推荐用**软链接**安装。这样后续只要更新当前仓库,Claude Code、Codex、Cursor、OpenClaw、Hermes 等运行时都能读到最新版本,不需要重复复制。
 
-#### Claude Code
+常见安装路径：
 
-推荐安装:
+| 运行时 | skills 目录 |
+|---|---|
+| Hermes | `~/.hermes/skills/` |
+| Claude Code | `~/.claude/skills/` |
+| Codex | `~/.codex/skills/` |
+| OpenClaw | `~/.openclaw/skills/` 或 `<workspace>/skills/` |
+
+示例，把当前仓库软链接到 Hermes：
 
 ```bash
-mkdir -p ~/.claude/skills
-ln -s "$(pwd)" ~/.claude/skills/wechat-publisher
+mkdir -p ~/.hermes/skills
+ln -s "$(pwd)" ~/.hermes/skills/wechat-publisher
 ```
 
-如果目标目录已存在,可先删除旧目录,或改用复制安装:
-
-```bash
-cp -R "$(pwd)" ~/.claude/skills/wechat-publisher
-```
-
-安装后重启 Claude Code,或开启一个新会话让 skill 被重新发现。
+如果目标目录已存在,可先删除旧目录,或改用复制安装。安装后重启对应 Agent 或新开会话，让 skill discovery 生效。
 
 #### Codex
 
@@ -261,11 +259,7 @@ python3 scripts/publish.py \
 - `--debug` —— 把中间产物 `article_output.html` 写到临时目录(默认使用 `tempfile.mkdtemp()`)
 - `--sync zhihu,juejin` 或 `--sync-from-config` —— 阶段 7 多平台同步(opt-in)
 
-**从已有HTML发布**:
-
-```bash
-python3 scripts/publish.py --account main --html article.html --cover cover.jpg --title "标题"
-```
+**不要用已有 HTML 发布正文图**：`--html article.html` 不会扫描并上传 Markdown 中的本地正文图片，容易导致正文图空白。发布正式文章统一使用上面的 `--input article.md`。
 
 **只做格式转换(Markdown → 微信HTML)**:
 
@@ -435,45 +429,16 @@ python3 scripts/html_converter.py article.md --theme my-brand -o preview.html
 
 ## 配图生成
 
-所有配图默认通过项目内置 **`scripts/generate_image.py`** 生成,统一使用手绘蓝色信息图风格。具体 prompt 模板和风格要点见 `SKILL.md` 阶段四。
+默认配图流程以 `SKILL.md` 为准：
 
-项目内置生图脚本示例:
+1. 先识别文章里已有的 `original-*` / `screenshot-*` 原图，截图、产品界面、数据图必须保留
+2. 只给没有原始视觉素材的纯文字段落生成 AI 配图
+3. 通过 Hermes 本地 OpenAI-compatible 生图路由 `local-openai-image / gpt-image-2` 逐张生成，不并行批量打接口
+4. 图片保存到 `sunwork/<date-slug>/images/`
+5. 插入 `article.md` 时使用绝对路径
+6. 发布统一使用 `publish.py --input article.md`，让脚本上传正文图到微信 CDN
 
-```bash
-python3 scripts/generate_image.py \
-  --account main \
-  --provider gemini-proxy \
-  --prompt "A hand-drawn blue infographic about MCP servers" \
-  --image ./images/01.png
-```
-
-Gemini CLI / chat 代理环境变量:
-
-```bash
-image_generation:
-  generator: "baoyu-image-gen"
-  gemini_proxy:
-    base_url: "https://cli.sora.locker/"
-    api_key: "sk-..."
-    image_model: "gemini-2.5-flash"
-```
-
-切换到 Web 登录版 Gemini:
-
-```yaml
-accounts:
-  main:
-    image_generator: "baoyu-danger-gemini-web"
-```
-
-也可单次命令覆盖:
-
-```bash
-python3 scripts/generate_image.py \
-  --generator baoyu-danger-gemini-web \
-  --prompt "A hand-drawn blue infographic about MCP servers" \
-  --image ./images/01.png
-```
+历史 `scripts/generate_image.py`、Web Gemini、Codex OAuth 相关内容只作为旧方案排障资料，不是默认发布链路。
 
 ## 常见问题
 
@@ -503,7 +468,7 @@ python3 scripts/generate_image.py \
 测试套件不依赖真实微信凭证(所有网络调用被 mock):
 
 ```bash
-pip install pytest --break-system-packages
+python3 -m pip install pytest
 python3 -m pytest tests/ -v
 ```
 
