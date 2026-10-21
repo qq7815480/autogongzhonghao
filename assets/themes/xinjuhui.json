@@ -1,0 +1,58 @@
+{
+  "theme_name": "xinjuhui",
+  "description": "芯矩慧科技风 - 深藏青 + 亮青色 + 彩色卡片，现代感少儿科技教育风格，适合课程/产品/科技类文章",
+  "styles": {
+    "body": "font-family: -apple-system, 'PingFang SC', 'Microsoft YaHei', 'Helvetica Neue', sans-serif; font-size: 15.5px; color: #27314D; line-height: 1.85; letter-spacing: 0.3px; padding: 20px 22px; background: #FFFFFF; max-width: 677px; margin: 0 auto;",
+    "h1": "font-size: 26px; font-weight: 800; color: #1A2456; text-align: center; margin: 38px 0 24px; padding: 0 0 16px 0; letter-spacing: 1px; line-height: 1.4; border-bottom: 2px solid #00D4FF;",
+    "h2": "font-size: 22px; font-weight: 800; color: #1A2456; margin: 36px 0 16px; padding: 0 0 10px 0; border-bottom: 2px solid #007E99; line-height: 1.5; letter-spacing: 1px;",
+    "h3": "font-size: 18px; font-weight: 800; color: #1A2456; margin: 28px 0 12px; padding: 0 0 0 14px; border-left: 4px solid #00D4FF; letter-spacing: 0.5px; line-height: 1.5;",
+    "p": "margin: 18px 0; text-indent: 0; text-align: justify; color: #27314D; line-height: 1.85; font-size: 15.5px;",
+    "blockquote": "margin: 26px 0; padding: 18px 18px 18px 20px; background: #F4F8FC; border-left: 4px solid #00D4FF; border-radius: 0 12px 12px 0; color: #27314D; font-size: 15.5px; line-height: 1.85;",
+    "img": "max-width: 100%; height: auto; border-radius: 14px; margin: 18px auto 6px; display: block;",
+    "strong": "color: #1A2456; font-weight: 800; border-bottom: 2px solid #00D4FF; padding: 0 1px;",
+    "em": "font-style: italic; color: #007E99;",
+    "code_inline": "background: #F4F8FC; color: #007E99; padding: 2px 8px; border-radius: 4px; font-size: 13px; font-family: 'SF Mono', 'Menlo', 'Consolas', monospace;",
+    "code_block": "background: #0B1026; color: #D6DDF2; padding: 18px 20px; border-radius: 12px; font-size: 12.5px; line-height: 1.7; font-family: 'SF Mono', 'Menlo', 'Consolas', monospace; overflow-x: auto; white-space: pre; margin: 24px 0; -webkit-overflow-scrolling: touch;",
+    "ul": "margin: 20px 0; padding-left: 0; list-style: none;",
+    "ol": "margin: 20px 0; padding-left: 0; list-style: none; counter-reset: list;",
+    "li": "margin: 12px 0; line-height: 1.85; color: #27314D; font-weight: 400;",
+    "li_bullet": "color: #00D4FF; font-weight: 700; font-size: 13px; display: inline-block; min-width: 16px; margin-right: 8px; text-align: left;",
+    "li_bullet_char": "●",
+    "li_number": "color: #007E99; font-weight: 800; font-size: 14px; min-width: 22px; display: inline-block; margin-right: 10px;",
+    "hr": "border: none; height: 2px; background: linear-gradient(to right, transparent, #00D4FF, transparent); margin: 40px 0;",
+    "a": "color: #007E99; text-decoration: none; border-bottom: 1px solid rgba(0,126,153,0.4);",
+    "table": "width: 100%; border-collapse: collapse; margin: 24px 0; font-size: 14px; border: 1px solid #DCE7F1; border-radius: 12px; overflow: hidden; table-layout: fixed; word-break: break-word;",
+    "th": "background: #0B1026; color: #F7FAFF; padding: 12px 14px; text-align: left; font-weight: 700; font-size: 12.5px; word-break: break-word; line-height: 1.5; letter-spacing: 1px;",
+    "td": "padding: 11px 10px; border-bottom: 1px solid #E8EFF7; color: #27314D; font-size: 13px; word-break: break-word; line-height: 1.6;",
+    "caption": "font-size: 12px; color: #8A94A6; text-align: center; margin: 9px 4px 0; letter-spacing: 0.5px; line-height: 1.6;",
+    "section_divider": "text-align: center; color: #00D4FF; letter-spacing: 10px; font-size: 14px; margin: 16px 0 34px; user-select: none;"
+  },
+  "highlights": {
+    "hl_yellow": "background: #FFF8E8; color: #6F5A2D; padding: 2px 7px; border-radius: 3px; font-weight: 500;",
+    "hl_blue": "background: #E3F2FF; color: #1767AA; padding: 2px 7px; border-radius: 3px; font-weight: 500;",
+    "hl_pink": "background: #F8E8E8; color: #8A2A2A; padding: 2px 7px; border-radius: 3px; font-weight: 500;",
+    "hl_green": "background: #E8F5E8; color: #267B34; padding: 2px 7px; border-radius: 3px; font-weight: 500;",
+    "em_red": "color: #D93025; font-weight: 800;",
+    "em_blue": "color: #2684D9; font-weight: 800;",
+    "em_orange": "color: #FF9F43; font-weight: 800;"
+  },
+  "section_divider_text": "◆  ◆  ◆",
+  "code_colors": {
+    "kw": "color: #00D4FF; font-weight: 600;",
+    "str": "color: #7EC8E3;",
+    "num": "color: #FF9F43;",
+    "fn": "color: #BDE7C1;",
+    "cls": "color: #D4C1FF;",
+    "comm": "color: #5A637E; font-style: italic;",
+    "punct": "color: #8A94A6;"
+  },
+  "list_style": {
+    "label": "A · 亮青色科技风",
+    "num_container": "display: inline-block; color: #007E99; font-family: -apple-system, 'PingFang SC', sans-serif; font-weight: 800; font-size: 15px; margin-right: 10px; min-width: 22px; line-height: 1; vertical-align: -2px;",
+    "num_prefix": "",
+    "num_suffix": "",
+    "num_formatter": "decimal",
+    "bullet_container": "display: inline-block; color: #00D4FF; font-family: sans-serif; font-size: 10px; margin-right: 10px; font-weight: 700;",
+    "bullet_char": "●"
+  }
+}

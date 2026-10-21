@@ -482,7 +482,7 @@ def convert_markdown_to_wechat_html(
             src_raw = img_match.group(2)
             alt = html.escape(alt_raw, quote=True)
             src = html.escape(src_raw, quote=True)
-            html_parts.append(f'<p style="text-align:center;margin:16px 0;"><img src="{src}" alt="{alt}" style="{styles["img"]}"/></p>')
+            html_parts.append(f'<p style="text-align:center;margin:14px 0 4px;"><img src="{src}" alt="{alt}" style="{styles["img"]}"/></p>')
             if alt_raw:
                 html_parts.append(f'<p style="{styles["caption"]}">{alt}</p>')
             prev_was_h2 = False

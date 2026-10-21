@@ -44,8 +44,11 @@ AI_PHRASES = [
     r"首先[,，].{0,8}其次[,，].{0,10}最后",
     r"首先[,，].{0,8}其次[,，].{0,10}再次",
     r"不仅.{0,10}而且",
-    r"一方面.{0,15}另一方面",
+    r"一方面.{1,15}另一方面",
     r"值得一提的是",
+    r"值得注意的是",
+    r"与此同时",
+    r"无独有偶",
     r"不可否认",
     r"毋庸置疑",
     r"综上所述",
@@ -73,6 +76,34 @@ AI_PHRASES = [
     r"翻开了.{1,10}新的一页",
     r"具有(重要|深远|里程碑)的意义",
     r"产生了(深远|重大|巨大)的影响",
+    # --- 系动词回避: AI 用"堪称/充当/扮演"替代"是/就是" ---
+    r"(堪称|充当|扮演)(.{2,10})的?(利器|桥梁|典范|标志|象征|证明|基石|核心|关键|驱动力|催化剂)",
+    r"作为.{2,10}的?(有力|最佳|完美|重要|核心|关键|不可或缺)?(证明|象征|标志|体现|典范|代表)",
+    # --- 预告式宣告 ---
+    r"接下来.{0,6}(让我们|我们|将)(一起|深入|详细|共同)",
+    r"下面.{0,4}(让我们|我们|将)(一起|深入|详细|共同)",
+    r"接下来我们来(看看|聊聊|谈谈|分析|探讨)",
+    r"下面我们就来(看看|聊聊|谈谈|分析|探讨)",
+    # --- 虚假对比范围 / 假史诗排比 ---
+    r"从.{2,8}到.{2,8}(，|,)从.{2,8}到.{2,8}",
+    r"从小白到(大佬|大神|专家)",
+    r"从入门到精通",
+    r"从零到一",
+    r"从.{2,6}走向.{2,6}",
+    # --- 营销化 / 广告腔 ---
+    r"令人叹为观止",
+    r"拥有丰富.{0,6}(底蕴|文化|内涵|传承)",
+    r"坐落在.{0,10}(中心|腹地|核心)",
+    r"作为.{2,10}的焦点",
+    r"无缝(衔接|连接|融合|对接)",
+    r"直观且充满活力",
+    r"丰富且(充满|极具|富有)",
+    # --- 空洞正面结论 ---
+    r"(总之|总的来说|总而言之).{0,10}(值得期待|前景广阔|未来可期|拭目以待|令人期待)",
+    r"相信在不久的将来",
+    r"让我们(拭目以待|共同期待)",
+    r"在新时代的(浪潮|洪流|征程)中",
+    r"开启.{2,10}(新(篇章|征程|纪元|时代)|下一个.{2,6})",
 ]
 
 # AI 高频名词 / 形容词(整篇密集出现即扣分)
@@ -83,7 +114,40 @@ AI_VOCAB = [
     "引领", "颠覆", "革命性", "前所未有", "核心竞争力", "范式", "新范式",
     "降本增效", "数字化转型", "智能化", "生态体系", "产业升级",
     "破局", "出圈", "破圈", "沉淀", "赋予", "深耕", "蓝图", "新篇章",
+    # --- 从 humanizer-zh 合并的高频 AI 词 ---
+    "玩法", "愿景", "重新定义", "开辟新赛道", "加速器", "原生",
+    "新物种", "新格局", "新态势", "新起点", "新征程",
+    "深度整合", "全面赋能", "精细化", "深度优化",
+    "场景化", "多元化", "全方位", "立体化", "体系化", "系统化",
+    "持续迭代",
 ]
+
+# 中文长文中常见的模型化句法。这里按“提醒”处理，不做绝对禁用：
+# 正常、有事实依据的对比句和行业术语仍可保留。
+PIVOT_PATTERNS = [
+    r"(?:并)?不是[^。！？\n]{1,90}而是",
+    r"并非[^。！？\n]{1,90}而是",
+    r"不在于[^。！？\n]{1,90}而在于",
+    r"与其说[^。！？\n]{1,90}(?:不如|毋宁|倒不如)",
+    r"你以为[^。！？\n]{1,70}(?:其实|实际|结果)",
+    r"看似[^。！？\n]{1,70}(?:其实|实际|实则)",
+    r"[^，。！？\n]{1,16}不重要，(?:重要|要紧)的是",
+]
+
+NOMINALIZATION_PATTERNS = [
+    r"进行(?:了|一次|一场|着)?[^。，！？\n]{0,12}(?:调整|优化|升级|分析|讨论|沟通|梳理|复盘|迭代|探索|尝试|思考|规划|布局)",
+    r"实现了?[^。，！？\n]{0,16}的?[^。，！？\n]{0,8}(?:提升|增长|突破|转变|跃升|落地)",
+    r"完成了?对[^。，！？\n]{0,18}的",
+    r"起到了?[^。，！？\n]{0,14}的?作用",
+]
+
+CONJUNCTIONS = (
+    "因为", "所以", "但是", "然而", "同时", "此外", "而且", "并且", "因此", "不仅",
+)
+
+REPEATED_OPENERS = (
+    "其实", "不过", "当然", "所以", "但是", "后来", "当时", "很多人", "问题是", "更重要的是", "说到这里",
+)
 
 
 def _strip_markdown(md_text: str) -> str:
@@ -215,53 +279,113 @@ def score_structural_perfection(text: str) -> tuple:
 
 
 def score_punctuation_flatness(text: str) -> tuple:
-    """检测标点单调度(真人会用破折号、问号、省略号、感叹号)。"""
+    """检测标点单调度。只做低权重提醒，不鼓励为了得分硬加标点。"""
     chars = len(text)
     flavor = 0
-    flavor += text.count("——") * 3
-    flavor += text.count("…") * 2
+    flavor += text.count("——")
+    flavor += min(3, text.count("…"))
     flavor += text.count("?") + text.count("？")
-    flavor += (text.count("!") + text.count("！")) // 2  # 感叹号加分但上限低
-    flavor += text.count("(") + text.count("（") + text.count(")") + text.count("）")
-    # 每 1000 字期望出现 5 次以上"人味标点";短文本用 200 字做下限避免过度敏感
-    expected = max(chars, 200) / 1000 * 5
+    flavor += min(3, text.count("!") + text.count("！"))
+    flavor += min(4, text.count("(") + text.count("（"))
+    # 每 1000 字只期望少量自然变化；达到后不继续奖励堆标点。
+    expected = max(chars, 400) / 1000 * 2
     ratio = flavor / expected if expected else 0
     if ratio >= 1:
         ai = 10
     elif ratio >= 0.5:
-        ai = 30
+        ai = 35
     elif ratio >= 0.2:
         ai = 60
     else:
-        ai = 85
+        ai = 80
     return round(float(ai), 1), {
         "flavor_points": flavor,
         "expected": round(expected, 1),
         "ratio": round(ratio, 2),
+        "note": "仅作提醒，不要为降分硬加标点",
+    }
+
+
+def score_prose_patterns(text: str) -> tuple:
+    """检测中文长文的翻案腔、名词化、连词过密和段落模板化。"""
+    pivot_hits = []
+    for pattern in PIVOT_PATTERNS:
+        pivot_hits.extend(m.group(0) for m in re.finditer(pattern, text))
+
+    nominal_hits = []
+    for pattern in NOMINALIZATION_PATTERNS:
+        nominal_hits.extend(m.group(0) for m in re.finditer(pattern, text))
+
+    char_count = max(1, len(text))
+    conjunction_count = sum(text.count(word) for word in CONJUNCTIONS)
+    conjunction_density = conjunction_count / (char_count / 1000)
+
+    paragraphs = [
+        re.sub(r"\s+", " ", block).strip()
+        for block in re.split(r"\n\s*\n", text)
+        if len(re.findall(r"[\u4e00-\u9fff]", block)) >= 4
+    ]
+
+    opener_counts = {}
+    for paragraph in paragraphs:
+        value = paragraph.lstrip("“‘\"（(")
+        for opener in REPEATED_OPENERS:
+            if value.startswith(opener):
+                opener_counts[opener] = opener_counts.get(opener, 0) + 1
+                break
+    repeated_openers = {k: v for k, v in opener_counts.items() if v >= 4}
+
+    short_streaks = 0
+    streak = 0
+    for paragraph in paragraphs:
+        han = len(re.findall(r"[\u4e00-\u9fff]", paragraph))
+        sentences = len(re.findall(r"[。！？!?]", paragraph))
+        if han <= 24 and sentences <= 1:
+            streak += 1
+            if streak == 4:
+                short_streaks += 1
+        else:
+            streak = 0
+
+    score = min(30, len(pivot_hits) * 8)
+    score += min(20, len(nominal_hits) * 5)
+    if conjunction_density > 8:
+        score += min(25, (conjunction_density - 8) * 4)
+    score += min(15, sum(v - 3 for v in repeated_openers.values()) * 5)
+    score += min(10, short_streaks * 10)
+
+    return round(min(100.0, float(score)), 1), {
+        "pivot_count": len(pivot_hits),
+        "pivot_samples": pivot_hits[:6],
+        "nominalization_count": len(nominal_hits),
+        "nominalization_samples": nominal_hits[:6],
+        "conjunction_density_per_1k": round(conjunction_density, 2),
+        "repeated_openers": repeated_openers,
+        "short_paragraph_streaks": short_streaks,
+        "note": "这些是语境提醒，不是绝对禁用项",
     }
 
 
 # ---------- 总评 ----------
 
-# 长文(news)用的完整 5 维权重
+# 长文(news)权重：把标点降为低权重提醒，新增中文句法与段落模式。
 WEIGHTS_NEWS = {
-    "burstiness": 0.30,
-    "phrases": 0.30,
-    "vocab": 0.20,
+    "burstiness": 0.25,
+    "phrases": 0.25,
+    "vocab": 0.15,
     "structural": 0.10,
-    "punctuation": 0.10,
+    "punctuation": 0.05,
+    "prose_patterns": 0.20,
 }
 
-# 短文(newspic 贴图)用的精简权重
-# - 短文本里 burstiness 和 structural 都不稳定(句子/枚举少),权重归 0
-# - phrases 和 vocab 是 AI 味主要来源
-# - punctuation 保留兜底(整篇只有句号也是 AI 信号)
+# 短文(newspic 贴图)用的精简权重。
 WEIGHTS_NEWSPIC = {
     "burstiness": 0.0,
-    "phrases": 0.55,
-    "vocab": 0.35,
+    "phrases": 0.50,
+    "vocab": 0.30,
     "structural": 0.0,
     "punctuation": 0.10,
+    "prose_patterns": 0.10,
 }
 
 # 向后兼容:现有代码从本模块 `from ai_score import WEIGHTS` 的地方仍然能读到长文权重
@@ -290,6 +414,7 @@ def analyze(md_text: str, mode: str = "news") -> dict:
     v_score, v_det = score_vocab(plain)
     s_score, s_det = score_structural_perfection(plain)
     pu_score, pu_det = score_punctuation_flatness(plain)
+    pr_score, pr_det = score_prose_patterns(plain)
 
     weights = _weights_for(mode)
     total = (
@@ -298,6 +423,7 @@ def analyze(md_text: str, mode: str = "news") -> dict:
         + v_score * weights["vocab"]
         + s_score * weights["structural"]
         + pu_score * weights["punctuation"]
+        + pr_score * weights["prose_patterns"]
     )
 
     verdict = (
@@ -318,6 +444,7 @@ def analyze(md_text: str, mode: str = "news") -> dict:
             "vocab":        {"score": v_score,  "detail": v_det},
             "structural":   {"score": s_score,  "detail": s_det},
             "punctuation":  {"score": pu_score, "detail": pu_det},
+            "prose_patterns": {"score": pr_score, "detail": pr_det},
         },
         "weights": weights,
     }
@@ -343,7 +470,7 @@ def check_ai_score(
             - total_score: float  总分 0-100
             - mode: str
             - dimensions: dict    各维度原始分(未加权)
-                - burstiness / phrases / vocab / structural / punctuation
+                - burstiness / phrases / vocab / structural / punctuation / prose_patterns
             - hit_phrases: list[str]  命中的 AI 套话样本
             - hit_vocab:   list[str]  命中的 AI 词汇样本
             - threshold:   float
@@ -362,9 +489,11 @@ def check_ai_score(
             "vocab":       dims["vocab"]["score"],
             "structural":  dims["structural"]["score"],
             "punctuation": dims["punctuation"]["score"],
+            "prose_patterns": dims["prose_patterns"]["score"],
         },
         "hit_phrases": hit_phrases,
         "hit_vocab":   hit_vocab,
+        "prose_detail": dims["prose_patterns"]["detail"],
         "threshold":   float(threshold),
     }
     passed = report["total_score"] < threshold
@@ -398,7 +527,21 @@ def _pretty_print(report: dict):
         elif name == "burstiness" and det.get("cv") is not None:
             print(f"      句长均值 {det['mean_length']} 字,CV={det['cv']}")
         elif name == "punctuation":
-            print(f"      人味标点 {det.get('flavor_points', 0)} 次,期望 {det.get('expected', 0)}")
+            print(f"      人味标点 {det.get('flavor_points', 0)} 次,期望 {det.get('expected', 0)}（仅提醒，不要硬加）")
+        elif name == "prose_patterns":
+            print(
+                "      中文句法提醒: "
+                f"翻案腔 {det.get('pivot_count', 0)}，"
+                f"名词化 {det.get('nominalization_count', 0)}，"
+                f"连词密度 {det.get('conjunction_density_per_1k', 0)}/千字，"
+                f"短句段连排 {det.get('short_paragraph_streaks', 0)}"
+            )
+            for s in det.get("pivot_samples", [])[:4]:
+                print(f"        · 疑似翻案腔: {s}")
+            for s in det.get("nominalization_samples", [])[:3]:
+                print(f"        · 疑似名词化: {s}")
+            if det.get("repeated_openers"):
+                print(f"        · 段首重复: {det['repeated_openers']}")
         elif name == "structural" and det.get("hit_count"):
             print(f"      教科书枚举命中 {det['hit_count']} 次")
     print("=" * 60)

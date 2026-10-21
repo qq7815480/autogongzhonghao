@@ -293,6 +293,14 @@ def publish_from_markdown(
     # 移除标题后处理（标题不包含在正文中）
     content_md = remove_title_from_content(md_content)
     processed_md, img_mapping, first_img = process_article_images(content_md, temp_dir)
+    # 硬门槛：任意正文图上传失败都不得继续创建缺图草稿。
+    discovered_images = re.findall(r'!\[[^\]]*\]\(([^)]+)\)', content_md)
+    if len(img_mapping) != len(discovered_images):
+        print(
+            f"  错误：正文图片上传不完整：{len(img_mapping)}/{len(discovered_images)}，"
+            "已停止创建草稿"
+        )
+        sys.exit(1)
 
     # 6. 转换HTML
     print("\n[步骤3] 转换HTML排版...")
